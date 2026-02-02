@@ -3,7 +3,7 @@ import time
 import random
 import json
 
-ENDPOINT_URL = "http://localhost:800/update-twin"
+ENDPOINT_URL = "http://localhost:8000/update-twin"
 DEVICE_ID = "sensor_01"
 
 def generate_temperature(current_temp):
@@ -24,13 +24,13 @@ def run_virtual_sensor():
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 "status": "online"
             }
-        try:
-            response = requests.post(ENDPOINT_URL, json=payload)
-            print(f"Sent: {current_temp}°C | Status: {response.status_code}")
-        except requests.exceptions.ConnectionError:
-            print("Error: Backend is offline. Retrying")
+            try:
+                response = requests.post(ENDPOINT_URL, json=payload)
+                print(f"Sent: {current_temp}°C | Status: {response.status_code}")
+            except requests.exceptions.ConnectionError:
+                print("Error: Backend is offline. Retrying")
 
-        time.sleep(2)
+            time.sleep(2)
     except KeyboardInterrupt:
         print("Sensor stopped by user")
 
