@@ -21,6 +21,8 @@ def update_twin(data:schemas.DataIn, db:Session = Depends(database.get_db)):
     db.commit()
     db.refresh(new_reading)
 
+    return new_reading
+
 
 @app.get("/twin-status")
 def get_twin_status():

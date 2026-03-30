@@ -42,8 +42,8 @@ def run_monitor():
             analysis = analyze(state)
 
             print(f"[{time.strftime('%H:%M:%S')}] {analysis}")
-        
-    time.sleep(5)
+
+        time.sleep(5)
 
 if __name__ == "__main__":
     run_monitor()
