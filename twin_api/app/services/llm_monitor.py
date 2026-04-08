@@ -4,6 +4,18 @@ import json
 import os
 
 TWIN_API_URL = "http://localhost:8000/twin-status"
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+SYSTEM_PROMPT = """You are an AI monitoring agent for an IoT digital twin system.
+You receive real-time sensor data and must analyze it for anomalies, trends, and risks.
+
+Your response must always follow this exact format:
+STATUS: <NOMINAL | WARNING | CRITICAL>
+ANALYSIS: <one sentence describing what you observe>
+ACTION: <one sentence recommending what to do, or 'No action required'>
+
+Be concise. Do not add any extra text outside this format."""
 
 def get_twin_state():
     try:
@@ -11,38 +23,84 @@ def get_twin_state():
         if response.status_code == 200:
             return response.json()
         else:
-            print(f"Error fetching data: {response.status_code}")
+            print(f"Error fetching twin state: {response.status_code}")
             return None
-        
     except Exception as e:
         print(f"Connection failed: {e}")
         return None
 
-def analyze(sensor_data):
-    device = "sensor_01"
+def analyze_with_claude(sensor_data):
+    if not ANTHROPIC_API_KEY:
+        raise EnvironmentError("ANTHROPIC_API_KEY environment variable is not set.")
 
-    data = sensor_data[device]
-    temp = data['temperature']
+    user_message = f"""Analyze the following digital twin sensor data and detect any anomalies:
 
-    if temp > 25.0:
-        return f"Critical: Overheating detected at {temp}°C! Immediate cooling required."
-    elif temp > 23.0:
-        return f"Warning: Temperature rising ({temp}°C). Monitor closely."
+{json.dumps(sensor_data, indent=2)}
+
+Respond strictly in the required format."""
+
+    payload = {
+        "model": "claude-opus-4-5",
+        "max_tokens": 200,
+        "system": SYSTEM_PROMPT,
+        "messages": [
+            {"role": "user", "content": user_message}
+        ]
+    }
+
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+    }
+
+    response = requests.post(ANTHROPIC_API_URL, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        return response.json()["content"][0]["text"].strip()
     else:
-        return f"Nominal: System operating normally at {temp}°C."
+        raise RuntimeError(f"Claude API error {response.status_code}: {response.text}")
+
+def format_output(analysis: str) -> str:
+    lines = {line.split(":")[0].strip(): ":".join(line.split(":")[1:]).strip()
+             for line in analysis.splitlines() if ":" in line}
+
+    status = lines.get("STATUS", "UNKNOWN")
+    status_icons = {"NOMINAL": "✓", "WARNING": "⚠", "CRITICAL": "✖", "UNKNOWN": "?"}
+    icon = status_icons.get(status, "?")
+
+    output = f"[{time.strftime('%H:%M:%S')}] {icon} {status}"
+    if "ANALYSIS" in lines:
+        output += f"\n  → {lines['ANALYSIS']}"
+    if "ACTION" in lines:
+        output += f"\n  → {lines['ACTION']}"
+    return output
 
 def run_monitor():
-    print("AI Monitor Initialized")
-    print(f"Listening to Digital Twin at: {TWIN_API_URL}")
+    print("=" * 50)
+    print("  Claude AI Monitor — Digital Twin System")
+    print("=" * 50)
+    print(f"  Twin API : {TWIN_API_URL}")
+    print(f"  Model    : claude-opus-4-5")
+    print(f"  Interval : 5s")
+    print("=" * 50)
+
+    if not ANTHROPIC_API_KEY:
+        print("\n[ERROR] ANTHROPIC_API_KEY is not set. Export it before running:\n")
+        print("  export ANTHROPIC_API_KEY=your_key_here\n")
+        return
 
     while True:
         state = get_twin_state()
 
         if state:
-            analysis = analyze(state)
+            try:
+                analysis = analyze_with_claude(state)
+                print(format_output(analysis))
+            except Exception as e:
+                print(f"[{time.strftime('%H:%M:%S')}] Analysis failed: {e}")
 
-            print(f"[{time.strftime('%H:%M:%S')}] {analysis}")
-
+        print()
         time.sleep(5)
 
 if __name__ == "__main__":
