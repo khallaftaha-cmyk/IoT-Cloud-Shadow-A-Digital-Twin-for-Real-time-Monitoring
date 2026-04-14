@@ -1,5 +1,6 @@
-from fastapi import status, HTTPException, Depends, WebSocket, WebSocketDisconnect, APIRouter
+from fastapi import status, Depends, WebSocket, WebSocketDisconnect, APIRouter, HTTPException
 from .. import schemas, database, models
+from ..routers import oauth2
 from sqlalchemy.orm import Session
 from typing import List
 import json
@@ -9,9 +10,8 @@ twin_state = {
     "sensor_01": {"temperature": "N/A", "status": "offline", "last_seen": "N/A"}
 }
 
-router = APIRouter(
-    tags=["twin"]
-)
+router = APIRouter(tags=["Twin"])
+
 
 class ConnectionManager:
     def __init__(self):
@@ -41,7 +41,11 @@ manager = ConnectionManager()
 
 
 @router.post("/update-twin", status_code=status.HTTP_201_CREATED, response_model=schemas.DataOut)
-async def update_twin(data: schemas.DataIn, db: Session = Depends(database.get_db)):
+async def update_twin(
+    data: schemas.DataIn,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
     twin_state[data.device_id] = {
         "temperature": data.temperature,
         "status": data.status,
@@ -63,12 +67,18 @@ async def update_twin(data: schemas.DataIn, db: Session = Depends(database.get_d
 
 
 @router.get("/twin-status")
-def get_twin_status():
+def get_twin_status(
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
     return twin_state
 
 
 @router.get("/history", response_model=list[schemas.DataIn])
-def get_history(limit: int = 10, db: Session = Depends(database.get_db)):
+def get_history(
+    limit: int = 10,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
     readings = db.query(models.SensorReading).order_by(
         models.SensorReading.timestamp.desc()
     ).limit(limit).all()
@@ -76,7 +86,25 @@ def get_history(limit: int = 10, db: Session = Depends(database.get_db)):
 
 
 @router.websocket("/ws/twin-status")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str,
+    db: Session = Depends(database.get_db),
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+    )
+    try:
+        token_data = oauth2.verify_access_token(token, credentials_exception)
+        user = db.query(models.User).filter(models.User.id == token_data.id).first()
+        if not user:
+            await websocket.close(code=1008)
+            return
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
         await websocket.send_text(json.dumps({

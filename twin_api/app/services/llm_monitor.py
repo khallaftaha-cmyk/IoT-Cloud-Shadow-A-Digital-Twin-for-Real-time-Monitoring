@@ -5,9 +5,13 @@ import time
 import os
 import requests
 
-TWIN_WS_URL = "ws://localhost:8000/ws/twin-status"
+BASE_URL = "http://localhost:8000"
+TWIN_WS_BASE = "ws://localhost:8000/ws/twin-status"
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+MONITOR_EMAIL = os.getenv("MONITOR_EMAIL", "monitor@twin.local")
+MONITOR_PASSWORD = os.getenv("MONITOR_PASSWORD", "monitor_password")
 
 SYSTEM_PROMPT = """You are an AI monitoring agent for an IoT digital twin system.
 You receive real-time sensor data and must analyze it for anomalies, trends, and risks.
@@ -20,7 +24,19 @@ ACTION: <one sentence recommending what to do, or 'No action required'>
 Be concise. Do not add any extra text outside this format."""
 
 
-def analyze_with_claude(sensor_data):
+def get_token() -> str:
+    response = requests.post(
+        f"{BASE_URL}/login",
+        data={"username": MONITOR_EMAIL, "password": MONITOR_PASSWORD}
+    )
+    if response.status_code == 200:
+        token = response.json()["access_token"]
+        print(f"[AUTH] Token acquired for '{MONITOR_EMAIL}'")
+        return token
+    raise RuntimeError(f"Login failed: {response.status_code} {response.text}")
+
+
+def analyze_with_claude(sensor_data: dict) -> str:
     user_message = f"""Analyze the following digital twin sensor data and detect any anomalies:
 
 {json.dumps(sensor_data, indent=2)}
@@ -41,11 +57,9 @@ Respond strictly in the required format."""
     }
 
     response = requests.post(ANTHROPIC_API_URL, headers=headers, json=payload)
-
     if response.status_code == 200:
         return response.json()["content"][0]["text"].strip()
-    else:
-        raise RuntimeError(f"Claude API error {response.status_code}: {response.text}")
+    raise RuntimeError(f"Claude API error {response.status_code}: {response.text}")
 
 
 def format_output(analysis: str) -> str:
@@ -53,8 +67,8 @@ def format_output(analysis: str) -> str:
              for line in analysis.splitlines() if ":" in line}
 
     status = lines.get("STATUS", "UNKNOWN")
-    status_icons = {"NOMINAL": "✓", "WARNING": "⚠", "CRITICAL": "✖", "UNKNOWN": "?"}
-    icon = status_icons.get(status, "?")
+    icons = {"NOMINAL": "✓", "WARNING": "⚠", "CRITICAL": "✖", "UNKNOWN": "?"}
+    icon = icons.get(status, "?")
 
     output = f"[{time.strftime('%H:%M:%S')}] {icon} {status}"
     if "ANALYSIS" in lines:
@@ -68,20 +82,21 @@ async def monitor():
     print("=" * 50)
     print("  Claude AI Monitor — Digital Twin System")
     print("=" * 50)
-    print(f"  Twin WS  : {TWIN_WS_URL}")
     print(f"  Model    : claude-opus-4-5")
     print(f"  Mode     : WebSocket (event-driven)")
     print("=" * 50)
 
     if not ANTHROPIC_API_KEY:
         print("\n[ERROR] ANTHROPIC_API_KEY is not set.\n")
-        print("  export ANTHROPIC_API_KEY=your_key_here\n")
         return
 
     while True:
         try:
-            async with websockets.connect(TWIN_WS_URL) as ws:
-                print(f"\n[WS] Connected to twin at {TWIN_WS_URL}\n")
+            token = get_token()
+            ws_url = f"{TWIN_WS_BASE}?token={token}"
+
+            async with websockets.connect(ws_url) as ws:
+                print(f"\n[WS] Connected and authenticated\n")
 
                 async for raw_message in ws:
                     message = json.loads(raw_message)
@@ -103,7 +118,7 @@ async def monitor():
             print(f"[WS] Connection lost: {e}. Retrying in 5s...\n")
             await asyncio.sleep(5)
         except Exception as e:
-            print(f"[WS] Unexpected error: {e}. Retrying in 5s...\n")
+            print(f"[WS] Error: {e}. Retrying in 5s...\n")
             await asyncio.sleep(5)
 
 
