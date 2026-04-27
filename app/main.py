@@ -1,5 +1,7 @@
 from fastapi import FastAPI
-from .routers import user, auth, twin
+
+from .routers import auth, twin
+from .routers import user
 from fastapi.middleware.cors import CORSMiddleware
 
 

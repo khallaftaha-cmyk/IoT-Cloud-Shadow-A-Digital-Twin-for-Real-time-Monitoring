@@ -1,6 +1,8 @@
 from fastapi import status, Depends, WebSocket, WebSocketDisconnect, APIRouter, HTTPException
-from .. import schemas, database, models
-from ..routers import oauth2
+
+from .. import database, models
+from .. import schemas
+from . import oauth2
 from sqlalchemy.orm import Session
 from typing import List
 import json
