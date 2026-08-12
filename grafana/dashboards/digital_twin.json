@@ -1,11 +1,11 @@
 {
   "id": null,
   "uid": "digital-twin-001",
-  "title": "Digital Twin — Sensor Monitor",
+  "title": "Digital Twin — Multi-Sensor & Actuation Monitor",
   "tags": ["iot", "digital-twin"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "5s",
   "time": { "from": "now-30m", "to": "now" },
   "panels": [
@@ -13,30 +13,14 @@
       "id": 1,
       "type": "timeseries",
       "title": "Temperature over time",
-      "gridPos": { "x": 0, "y": 0, "w": 16, "h": 9 },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "spanNulls": false
-          },
-          "unit": "celsius",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 23 },
-              { "color": "red", "value": 25 }
-            ]
-          }
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "celsius"
         }
-      },
-      "options": {
-        "tooltip": { "mode": "multi" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
       },
       "targets": [
         {
@@ -48,21 +32,41 @@
     },
     {
       "id": 2,
+      "type": "timeseries",
+      "title": "Humidity & Pressure",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT timestamp AS time, humidity FROM \"Sensor_Data\" WHERE $__timeFilter(timestamp) AND humidity IS NOT NULL ORDER BY timestamp ASC",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 3,
       "type": "gauge",
-      "title": "Latest temperature",
-      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 9 },
+      "title": "Latest Temperature",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 6 },
       "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
       "fieldConfig": {
         "defaults": {
           "unit": "celsius",
           "min": 0,
-          "max": 40,
+          "max": 50,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "orange", "value": 23 },
-              { "color": "red", "value": 25 }
+              { "color": "orange", "value": 25 },
+              { "color": "red", "value": 30 }
             ]
           }
         }
@@ -77,46 +81,22 @@
       ]
     },
     {
-      "id": 3,
-      "type": "stat",
-      "title": "Total readings",
-      "gridPos": { "x": 0, "y": 9, "w": 4, "h": 4 },
-      "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "blue", "value": null }]
-          }
-        }
-      },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT NOW() AS time, COUNT(*) AS total_readings FROM \"Sensor_Data\"",
-          "format": "time_series"
-        }
-      ]
-    },
-    {
       "id": 4,
-      "type": "stat",
-      "title": "Average temperature (last 30 min)",
-      "gridPos": { "x": 4, "y": 9, "w": 4, "h": 4 },
+      "type": "gauge",
+      "title": "Battery Level",
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 6 },
       "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
       "fieldConfig": {
         "defaults": {
-          "unit": "celsius",
-          "decimals": 2,
-          "color": { "mode": "thresholds" },
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 23 },
-              { "color": "red", "value": 25 }
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "green", "value": 50 }
             ]
           }
         }
@@ -125,86 +105,35 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT NOW() AS time, ROUND(AVG(temperature)::numeric, 2) AS avg_temp FROM \"Sensor_Data\" WHERE timestamp >= NOW() - INTERVAL '30 minutes'",
+          "rawSql": "SELECT NOW() AS time, COALESCE(battery_level, 100) AS battery FROM \"Sensor_Data\" ORDER BY timestamp DESC LIMIT 1",
           "format": "time_series"
         }
       ]
     },
     {
       "id": 5,
-      "type": "stat",
-      "title": "Max temperature (last 30 min)",
-      "gridPos": { "x": 8, "y": 9, "w": 4, "h": 4 },
+      "type": "table",
+      "title": "Recent Triggered Alerts",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 6 },
       "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "celsius",
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 23 },
-              { "color": "red", "value": 25 }
-            ]
-          }
-        }
-      },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT NOW() AS time, MAX(temperature) AS max_temp FROM \"Sensor_Data\" WHERE timestamp >= NOW() - INTERVAL '30 minutes'",
-          "format": "time_series"
+          "rawSql": "SELECT id, device_id, metric, value, severity, message, triggered_at FROM alerts ORDER BY triggered_at DESC LIMIT 10",
+          "format": "table"
         }
       ]
     },
     {
       "id": 6,
-      "type": "stat",
-      "title": "Device status",
-      "gridPos": { "x": 12, "y": 9, "w": 4, "h": 4 },
-      "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
-          },
-          "mappings": [
-            { "type": "value", "options": { "online": { "text": "ONLINE", "color": "green" }, "offline": { "text": "OFFLINE", "color": "red" } } }
-          ]
-        }
-      },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT NOW() AS time, status FROM \"Sensor_Data\" ORDER BY timestamp DESC LIMIT 1",
-          "format": "time_series"
-        }
-      ]
-    },
-    {
-      "id": 7,
       "type": "table",
-      "title": "Recent readings",
-      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 8 },
+      "title": "Actuation Commands Log",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 6 },
       "datasource": { "type": "postgres", "uid": "${DS_POSTGRESQL}" },
-      "fieldConfig": {
-        "defaults": { "custom": { "align": "auto" } },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "temperature" }, "properties": [{ "id": "unit", "value": "celsius" }, { "id": "custom.width", "value": 150 }] },
-          { "matcher": { "id": "byName", "options": "timestamp" }, "properties": [{ "id": "custom.width", "value": 220 }] },
-          { "matcher": { "id": "byName", "options": "status" }, "properties": [{ "id": "custom.width", "value": 100 }, { "id": "mappings", "value": [{ "type": "value", "options": { "online": { "text": "online", "color": "green" }, "offline": { "text": "offline", "color": "red" } } }] }] }
-        ]
-      },
-      "options": { "sortBy": [{ "displayName": "timestamp", "desc": true }] },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT id, device_id, temperature, status, timestamp FROM \"Sensor_Data\" ORDER BY timestamp DESC LIMIT 50",
+          "rawSql": "SELECT id, device_id, command, status, issued_at, acknowledged_at FROM actuator_commands ORDER BY issued_at DESC LIMIT 10",
           "format": "table"
         }
       ]

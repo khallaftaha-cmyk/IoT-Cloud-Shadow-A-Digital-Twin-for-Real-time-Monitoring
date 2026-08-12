@@ -6,6 +6,17 @@ from app.main import app
 from app.database import Base, get_db
 import os
 
+# Ensure default environment variables for testing
+os.environ.setdefault("DATABASE_HOSTNAME", "localhost")
+os.environ.setdefault("DATABASE_PORT", "5432")
+os.environ.setdefault("DATABASE_USERNAME", "postgres")
+os.environ.setdefault("DATABASE_PASSWORD", "khallaf")
+os.environ.setdefault("DATABASE_NAME", "fastapi")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-1234567890")
+os.environ.setdefault("ALGORITHM", "HS256")
+os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+os.environ.setdefault("ANTHROPIC_API_KEY", "")
+
 DATABASE_URL = (
     f"postgresql://{os.getenv('DATABASE_USERNAME')}:"
     f"{os.getenv('DATABASE_PASSWORD')}@"

@@ -34,6 +34,7 @@ markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
 packaging==26.1
+paho-mqtt==2.1.0
 passlib==1.7.4
 pluggy==1.6.0
 psycopg2-binary==2.9.11
@@ -49,6 +50,8 @@ python-dotenv==1.2.2
 python-jose==3.5.0
 python-multipart==0.0.22
 PyYAML==6.0.3
+redis==5.0.3
+requests==2.31.0
 rich==14.3.3
 rich-toolkit==0.19.7
 rignore==0.7.6
@@ -65,7 +68,6 @@ typing_extensions==4.15.0
 urllib3==2.6.3
 uvicorn==0.42.0
 watchfiles==1.1.1
-websocket==0.2.1
 websockets==16.0
 zope.event==6.1
 zope.interface==8.2

@@ -1,8 +1,10 @@
 version: '3.8'
 
 services:
+  # ── PostgreSQL Database ──────────────────────────────────────────────
+  # Stores: sensor readings, users, alert rules, alerts, actuator commands
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: postgres_db
     environment:
       - POSTGRES_USER=${DATABASE_USERNAME}
@@ -13,12 +15,43 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
+  # ── Redis ────────────────────────────────────────────────────────────
+  # Replaces the in-memory twin_state dict for persistence & scalability
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Mosquitto MQTT Broker ────────────────────────────────────────────
+  # Receives telemetry from real IoT hardware via MQTT protocol
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto_broker
+    ports:
+      - "1883:1883"   # MQTT standard port
+      - "9001:9001"   # WebSocket port (for browser-based MQTT clients)
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────
   api:
     build: .
     container_name: fastapi_api
@@ -33,11 +66,18 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - MQTT_BROKER_HOST=mqtt
+      - MQTT_BROKER_PORT=1883
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
+  # ── Grafana Dashboards ───────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
@@ -47,9 +87,6 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - DATABASE_USERNAME=${DATABASE_USERNAME}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_NAME=${DATABASE_NAME}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -59,6 +96,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── 3D Digital Twin Frontend ─────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: twin_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   grafana_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_log:
