@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     database_username: str
     secret_key: str
     algorithm: str
-    access_token_expire_minutes: int 
-    anthropic_api_key: str = ""  
+    access_token_expire_minutes: int  # Fixed: was 'access_token_expire' — must match .env key
+    anthropic_api_key: str = ""  # Optional: API starts without it; only LLM monitor needs it
 
     # Redis — used for persistent twin state (replaces in-memory dict)
     redis_url: str = "redis://localhost:6379/0"
@@ -22,5 +22,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Allow extra env vars in .env (like GRAFANA_USER) without error
 
 settings = Settings()
