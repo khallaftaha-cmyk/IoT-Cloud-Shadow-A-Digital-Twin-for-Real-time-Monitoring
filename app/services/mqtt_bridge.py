@@ -1,13 +1,18 @@
 import paho.mqtt.client as mqtt
+import ssl
 import json
 import asyncio
 import requests
 import os
 import time
 
-MQTT_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
-API_URL = os.getenv("INTERNAL_API_URL", "http://localhost:8000")
+MQTT_HOST = os.getenv("MQTT_BROKER_HOST", "a1tthoweuehg33-ats.iot.eu-north-1.amazonaws.com")
+MQTT_PORT = int(os.getenv("MQTT_BROKER_PORT", "8883"))
+CERTS_DIR = os.getenv("MQTT_CERTS_DIR", r"C:\Users\DELL\Desktop\project\Iot monitor\certs")
+
+CA_PATH = os.path.join(CERTS_DIR, "AmazonRootCA1.pem")
+CERT_PATH = os.path.join(CERTS_DIR, "2635e4acfbd39cc96f8b38fdb5f89c730426506892c14375d429ed8df3241608-certificate.pem.crt")
+KEY_PATH = os.path.join(CERTS_DIR, "2635e4acfbd39cc96f8b38fdb5f89c730426506892c14375d429ed8df3241608-private.pem.key")
 
 
 class MQTTBridge:
@@ -19,14 +24,24 @@ class MQTTBridge:
         self.client.on_message = self.on_message
         self._running = False
 
+        # Configure TLS if port 8883 (AWS IoT Core)
+        if self.port == 8883 and os.path.exists(CA_PATH) and os.path.exists(CERT_PATH) and os.path.exists(KEY_PATH):
+            print(f"[MQTT] Configuring TLS certificates for AWS IoT Core at {self.host}...")
+            self.client.tls_set(
+                ca_certs=CA_PATH,
+                certfile=CERT_PATH,
+                keyfile=KEY_PATH,
+                cert_reqs=ssl.CERT_REQUIRED,
+                tls_version=ssl.PROTOCOL_TLSv1_2
+            )
+
     def on_connect(self, client, userdata, flags, rc, properties=None):
         if rc == 0:
-            print(f"[MQTT] Connected successfully to broker at {self.host}:{self.port}")
-            # Subscribe to all device telemetry topics: iot/<device_id>/telemetry
+            print(f"[MQTT] Connected successfully to MQTT Broker at {self.host}:{self.port}")
             client.subscribe("iot/+/telemetry")
             print("[MQTT] Subscribed to topic 'iot/+/telemetry'")
         else:
-            print(f"[MQTT] Connection failed with status code {rc}")
+            print(f"[MQTT] Connection failed with return code {rc}")
 
     def on_message(self, client, userdata, msg):
         try:
@@ -40,9 +55,6 @@ class MQTTBridge:
                 payload["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%S")
 
             print(f"[MQTT] Received telemetry from '{device_id}': {payload.get('temperature')}°C")
-
-            # Forward telemetry to twin backend (internal call)
-            # In a unified process, this can also invoke twin update directly
         except Exception as e:
             print(f"[MQTT] Error parsing message on '{msg.topic}': {e}")
 
