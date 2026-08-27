@@ -182,7 +182,19 @@ async def websocket_endpoint(
             "message": "Subscribed to digital twin updates",
             "current_state": twin_state
         }))
+        # Send a ping every 25s so nginx proxy_read_timeout (60s) is never hit.
+        # The browser ignores unknown event types gracefully.
+        ping_counter = 0
         while True:
             await asyncio.sleep(1)
+            ping_counter += 1
+            if ping_counter >= 25:
+                ping_counter = 0
+                try:
+                    await websocket.send_text(json.dumps({"event": "ping"}))
+                except Exception:
+                    break  # client gone, clean up below
     except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
         manager.disconnect(websocket)

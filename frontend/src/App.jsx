@@ -35,17 +35,22 @@ export default function App() {
   // WebSocket Connection
   useEffect(() => {
     let ws;
+    let reconnectDelay = 1000;
+
     const connectWS = () => {
       ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
         setWsConnected(true);
-        console.log('[WS] Connected to Digital Twin stream');
+        reconnectDelay = 1000; // reset backoff on successful connect
+        console.log('[WS] Connected to Digital Twin stream at', WS_URL);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // Ignore server-side keepalive pings (they just prevent nginx timeout)
+          if (data.event === 'ping') return;
           if (data.event === 'twin_update' && data.data) {
             setTelemetry((prev) => ({ ...prev, ...data.data, device_id: data.device_id }));
           } else if (data.event === 'alert_triggered') {
@@ -56,9 +61,15 @@ export default function App() {
         }
       };
 
+      ws.onerror = (err) => {
+        console.error('[WS] Connection error — will reconnect in', reconnectDelay, 'ms', err);
+      };
+
       ws.onclose = () => {
         setWsConnected(false);
-        setTimeout(connectWS, 3000); // Auto reconnect
+        // Exponential backoff reconnect (1s → 2s → 4s → … max 30s)
+        setTimeout(connectWS, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
       };
     };
 
