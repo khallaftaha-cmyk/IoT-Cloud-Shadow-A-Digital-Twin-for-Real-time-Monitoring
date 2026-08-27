@@ -1,10 +1,15 @@
+import sys
+import os
+
+# Add project root to sys.path so 'app' package is found automatically by pytest
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.database import Base, get_db
-import os
 
 # Ensure default environment variables for testing
 os.environ.setdefault("DATABASE_HOSTNAME", "localhost")

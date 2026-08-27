@@ -61,6 +61,8 @@ jobs:
         run: pip install pytest httpx pytest-asyncio
 
       - name: Run tests
+        env:
+          PYTHONPATH: .
         run: pytest tests/ -v --tb=short
 
   # ── Job 2: Build & Push to ECR ──────────────────────────────────────────────
@@ -122,7 +124,7 @@ jobs:
               docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URI }}
 
             # Go to project directory
-            cd ~/digital-twin
+            cd ~/iot-monitor
 
             # Pull latest docker-compose and env
             docker compose pull api
