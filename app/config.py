@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -10,18 +10,16 @@ class Settings(BaseSettings):
     database_username: str
     secret_key: str
     algorithm: str
-    access_token_expire_minutes: int  # Fixed: was 'access_token_expire' — must match .env key
-    anthropic_api_key: str = ""  # Optional: API starts without it; only LLM monitor needs it
+    access_token_expire_minutes: int
+    anthropic_api_key: str = ""
 
-    # Redis — used for persistent twin state (replaces in-memory dict)
+    # Redis — used for persistent twin state
     redis_url: str = "redis://localhost:6379/0"
 
     # MQTT — used for hardware device ingestion bridge
     mqtt_broker_host: str = "localhost"
     mqtt_broker_port: int = 1883
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"  # Allow extra env vars in .env (like GRAFANA_USER) without error
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

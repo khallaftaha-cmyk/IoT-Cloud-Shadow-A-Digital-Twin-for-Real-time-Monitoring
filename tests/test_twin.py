@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime
 
-TEST_EMAIL = "sensortest@twin.local"
+TEST_EMAIL = "sensortest@example.com"
 TEST_PASSWORD = "sensorpassword123"
 
 

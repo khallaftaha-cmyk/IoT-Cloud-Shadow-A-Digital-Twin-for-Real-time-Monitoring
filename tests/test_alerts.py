@@ -1,6 +1,6 @@
 import pytest
 
-TEST_EMAIL = "alerttest@twin.local"
+TEST_EMAIL = "alerttest@example.com"
 TEST_PASSWORD = "password123"
 
 

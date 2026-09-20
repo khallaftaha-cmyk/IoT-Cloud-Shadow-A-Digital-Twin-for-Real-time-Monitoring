@@ -15,7 +15,7 @@ class SensorReading(Base):
     battery_level = Column(Float, nullable=True)
     status = Column(String, nullable=False)
     extra_metadata = Column(JSON, nullable=True)
-    timestamp = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+    timestamp = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
 
 
 class User(Base):
@@ -24,7 +24,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, nullable=False)
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
-    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
 
 class ActuatorCommand(Base):
@@ -36,7 +36,7 @@ class ActuatorCommand(Base):
     params = Column(JSON, nullable=True)
     status = Column(String, nullable=False, default="pending")  # pending, acknowledged, executed, failed
     issued_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    issued_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+    issued_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     acknowledged_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
 
@@ -51,7 +51,7 @@ class AlertRule(Base):
     severity = Column(String, nullable=False, default="warning")  # warning, critical
     is_active = Column(Boolean, nullable=False, default=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
 
 
 class Alert(Base):
@@ -66,5 +66,5 @@ class Alert(Base):
     severity = Column(String, nullable=False)
     message = Column(String, nullable=False)
     acknowledged = Column(Boolean, nullable=False, default=False)
-    triggered_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+    triggered_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
     acknowledged_at = Column(TIMESTAMP(timezone=True), nullable=True)
