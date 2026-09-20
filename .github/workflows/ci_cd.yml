@@ -8,7 +8,6 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION || 'eu-north-1' }}
-  ECR_REPOSITORY_URI: ${{ secrets.ECR_REPOSITORY_URI }}
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -65,72 +64,37 @@ jobs:
           PYTHONPATH: .
         run: pytest tests/ -v --tb=short
 
-  # ── Job 2: Build & Push to ECR ──────────────────────────────────────────────
-  build-and-push:
-    name: Build and push Docker image
+  # ── Job 2: Deploy to EC2 ────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
-    outputs:
-      image_uri: ${{ steps.build-push.outputs.image_uri }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push image to ECR
-        id: build-push
+      - name: Check EC2 SSH Secrets
+        id: check-secrets
         run: |
-          docker build -t $ECR_REPOSITORY_URI:$IMAGE_TAG .
-          docker tag $ECR_REPOSITORY_URI:$IMAGE_TAG $ECR_REPOSITORY_URI:latest
-          docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
-          docker push $ECR_REPOSITORY_URI:latest
-          echo "image_uri=$ECR_REPOSITORY_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-  # ── Job 3: Deploy to EC2 ────────────────────────────────────────────────────
-  deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+          if [ -n "${{ secrets.EC2_HOST }}" ] && [ -n "${{ secrets.EC2_SSH_KEY }}" ]; then
+            echo "has_ssh=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_ssh=false" >> $GITHUB_OUTPUT
+            echo "Skipping EC2 SSH deployment: EC2_HOST or EC2_SSH_KEY secret is missing."
+          fi
 
       - name: Deploy to EC2 via SSH
+        if: steps.check-secrets.outputs.has_ssh == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          username: ${{ secrets.EC2_USER || 'ubuntu' }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
-
-            # Configure AWS CLI to pull from ECR
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-              docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_URI }}
-
-            # Go to project directory
             cd ~/iot-monitor
-
-            # Pull latest docker-compose and env
-            docker compose pull api
-            docker compose up -d --no-deps api
-
-            # Clean up old images
-            docker image prune -f
-
-            echo "Deployment complete: ${{ needs.build-and-push.outputs.image_uri }}"
+            git pull origin main
+            docker compose up -d --build
+            echo "Deployment to EC2 complete!"
