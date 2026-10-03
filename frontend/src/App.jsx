@@ -14,8 +14,19 @@ import {
   RefreshCw 
 } from 'lucide-react';
 
-const API_BASE = '/api';
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/twin-status`;
+const envApiUrl = import.meta.env.VITE_API_URL;
+const API_BASE = envApiUrl ? envApiUrl.replace(/\/$/, '') : '/api';
+
+const getWsUrl = () => {
+  if (envApiUrl) {
+    const isHttps = envApiUrl.startsWith('https');
+    const host = envApiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return `${isHttps ? 'wss:' : 'ws:'}//${host}/ws/twin-status`;
+  }
+  return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/twin-status`;
+};
+
+const WS_URL = getWsUrl();
 
 export default function App() {
   const [telemetry, setTelemetry] = useState({
@@ -150,88 +161,91 @@ export default function App() {
 
               <div className="metric-card">
                 <div className="metric-label">
-                  <Droplets size={16} color="var(--accent-blue)" />
+                  <Droplets size={16} color="var(--accent-cyan)" />
                   Humidity
                 </div>
                 <div className="metric-value">
-                  {telemetry.humidity || 45.0}%
+                  {telemetry.humidity}%
                 </div>
               </div>
 
               <div className="metric-card">
                 <div className="metric-label">
-                  <Gauge size={16} color="var(--accent-green)" />
+                  <Gauge size={16} color="var(--accent-cyan)" />
                   Pressure
                 </div>
                 <div className="metric-value">
-                  {telemetry.pressure || 1013.2} hPa
+                  {telemetry.pressure} hPa
                 </div>
               </div>
 
               <div className="metric-card">
                 <div className="metric-label">
-                  <Battery size={16} color="var(--accent-orange)" />
+                  <Battery size={16} color="var(--accent-green)" />
                   Battery
                 </div>
                 <div className="metric-value">
-                  {telemetry.battery_level || 98.0}%
+                  {telemetry.battery_level}%
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Actuation & Alert Management */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Actuation Control Panel */}
+        {/* Right Column: Controls & Alert Feed */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Actuation Control Card */}
           <div className="glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
               <Power size={18} color="var(--accent-cyan)" />
-              <span style={{ fontWeight: 600 }}>Remote Actuation Control</span>
+              <span style={{ fontWeight: 600 }}>Remote Device Control</span>
             </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Send bi-directional control signals directly to physical device or digital twin.
-            </p>
 
-            <div className="actuation-buttons">
-              <button className="btn btn-primary" onClick={() => handleActuate('COOLING_ON')}>
-                <RefreshCw size={16} /> Activate Cooling System
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button 
+                className="btn btn-primary"
+                onClick={() => handleActuate('COOLING_ON')}
+              >
+                <RefreshCw size={16} />
+                Activate Cooling System
               </button>
-              <button className="btn btn-primary" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }} onClick={() => handleActuate('HEATING_OFF')}>
-                <CheckCircle2 size={16} /> Disengage Heater
-              </button>
-              <button className="btn btn-danger" onClick={() => handleActuate('EMERGENCY_SHUTDOWN')}>
-                <AlertTriangle size={16} /> Emergency Thermal Cutoff
+
+              <button 
+                className="btn btn-danger"
+                onClick={() => handleActuate('EMERGENCY_SHUTDOWN')}
+              >
+                <Power size={16} />
+                Emergency Shutdown
               </button>
             </div>
 
             {actuationStatus && (
-              <div style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--accent-cyan)', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ marginTop: '12px', fontSize: '0.85rem', color: 'var(--accent-cyan)', textAlign: 'center' }}>
                 {actuationStatus}
               </div>
             )}
           </div>
 
-          {/* Live Alert Engine Feed */}
-          <div className="glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <AlertTriangle size={18} color="var(--accent-orange)" />
-              <span style={{ fontWeight: 600 }}>Real-Time Threshold Alerts</span>
+          {/* Real-time Alert Feed */}
+          <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <AlertTriangle size={18} color="var(--accent-red)" />
+              <span style={{ fontWeight: 600 }}>Real-time Alert Feed</span>
             </div>
 
-            <div className="alerts-list">
+            <div className="alert-list" style={{ flex: 1 }}>
               {alerts.length === 0 ? (
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>
-                  No threshold breaches detected. All systems nominal.
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.85rem' }}>
+                  No threshold breaches detected
                 </div>
               ) : (
                 alerts.map((alert, idx) => (
-                  <div key={idx} className={`alert-item alert-${alert.severity}`}>
-                    <AlertTriangle size={16} color={alert.severity === 'critical' ? 'var(--accent-red)' : 'var(--accent-orange)'} />
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{alert.message}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(alert.triggered_at).toLocaleTimeString()}</div>
+                  <div key={idx} className={`alert-item ${alert.severity === 'critical' ? 'critical' : 'warning'}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{alert.device_id}</span>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{alert.severity.toUpperCase()}</span>
                     </div>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', opacity: 0.9 }}>{alert.message}</p>
                   </div>
                 ))
               )}
