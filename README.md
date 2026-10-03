@@ -12,7 +12,7 @@
 
 **A production-grade IoT platform featuring a live 3D Digital Twin Dashboard, bi-directional remote actuation, AI-powered threshold alert engine, MQTT hardware ingestion, and a full AWS cloud deployment on the Free Tier.**
 
-[🔴 Live Demo](http://13.62.228.155:5173) · [📖 API Docs](http://13.62.228.155:8000/docs) · [📊 Grafana](http://13.62.228.155:3000) · [🐛 Report Bug](https://github.com/khallaftaha-cmyk/IoT-Cloud-Shadow-A-Digital-Twin-for-Real-time-Monitoring/issues)
+[🔴 Live Demo](https://iot-twin-dashboard.onrender.com) · [📖 API Docs](https://iot-twin-backend.onrender.com/docs) · [📊 Grafana](http://13.62.228.155:3000) · [🐛 Report Bug](https://github.com/khallaftaha-cmyk/IoT-Cloud-Shadow-A-Digital-Twin-for-Real-time-Monitoring/issues)
 
 </div>
 
